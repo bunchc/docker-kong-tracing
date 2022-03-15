@@ -27,4 +27,6 @@ export KONG_VITALS=on
 # ref: https://docs.konghq.com/gateway/2.8.x/reference/configuration/#granular-tracing-section
 export KONG_TRACING=on
 
+# Start the environment
+docker-compose up -d
 ```
