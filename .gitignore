@@ -1,0 +1,9 @@
+.DS_Store
+.che
+kong.tar.gz
+kong-build-tools
+kong
+*.bak
+submit
+data/
+kong_data/

@@ -1,0 +1,202 @@
+version: "3.9"
+
+# vitals-compose.yaml
+#
+# A docker compose file to export Kong Vitals data to InfluxDB
+#
+# Additionally, exports tracing data to either Zipkin or Jaeger
+# By using the corresponding profile:
+# docker-compose --profile [zipkin|jaeger] up
+#
+# Granular tracing can also be enabled by setting the KONG_TRACING to "on"
+
+x-kong-config:
+  &kong-env
+  KONG_DATABASE: ${KONG_DATABASE:-off}
+  KONG_PG_DATABASE: ${KONG_PG_DATABASE:-kong}
+  KONG_PG_HOST: db
+  KONG_PG_USER: ${KONG_PG_USER:-kong}
+  KONG_PG_PASSWORD_FILE: /run/secrets/kong_postgres_password
+
+volumes:
+  kong_data: {}
+  kong_prefix_vol:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+  kong_tmp_vol:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+
+networks:
+  kong-net:
+    external: false
+
+services:
+  netshoot:
+    image: nicolaka/netshoot
+    networks:
+      - kong-net
+    command: bash /scripts/test.sh
+    volumes:
+      - ${PWD}:/scripts
+
+  zipkin:
+    profiles: [ "zipkin" ]
+    image: openzipkin/zipkin:2
+    networks:
+      kong-net:
+        aliases:
+          - metrics
+    ports:
+      - "9411:9411"
+    restart: on-failure
+
+  jaeger:
+    profiles: [ "jaeger" ]
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: ":9412"
+    image: jaegertracing/all-in-one:latest
+    networks:
+      kong-net:
+        aliases:
+          - metrics
+    ports:
+      - "9412:9412"
+      - "16686:16686"
+
+  http-echo:
+    image: "${ECHOSERVER_IMAGE:-gcr.io/kubernetes-e2e-test-images/echoserver:2.2}"
+    networks:
+      - kong-net
+    ports:
+      - "8080:8080"
+
+  tcp-echo:
+    image: istio/tcp-echo-server:1.1
+    networks:
+      - kong-net
+    ports:
+      - "9000:9000"
+
+  influxdb:
+    image: influxdb:1.8
+    profiles: [ "influx" ]
+    environment:
+      INFLUXDB_ADMIN_USER: admin
+      INFLUXDB_ADMIN_PASSWORD: admin
+      INFLUXDB_USER: user
+      INFLUXDB_USER_PASSWORD: user
+      INFLUXDB_DB: kong
+    volumes:
+      - ./data/influxdb:/var/lib/influxdb
+    networks:
+      - kong-net
+    ports:
+      - "8086:8086"
+      - "8083:8083"
+    restart: on-failure:5
+
+  deck:
+    image: kong/deck
+    command: sync --state /config/kong.yaml
+    profiles: [ "database" ]
+    networks:
+      - kong-net
+    depends_on:
+      kong:
+        condition: service_healthy
+    environment:
+      <<: *kong-env
+      DECK_KONG_ADDR: "http://kong:8001"
+    volumes:
+      - ./config:/config
+    restart: on-failure:5
+
+  kong-migrations:
+    image: "${KONG_DOCKER_TAG:-kong:latest}"
+    command: kong migrations bootstrap && kong migrations up && sleep 10 && kong migrations finish
+    profiles: [ "database" ]
+    depends_on:
+      - db
+    environment:
+      <<: *kong-env
+    secrets:
+      - kong_postgres_password
+    networks:
+      - kong-net
+    restart: on-failure
+
+  kong:
+    image: "${KONG_DOCKER_TAG:-kong:latest}"
+    user: "${KONG_USER:-kong}"
+    environment:
+      <<: *kong-env
+      KONG_VITALS: "${KONG_VITALS:-on}"
+      KONG_VITALS_STRATEGY: influxdb
+      KONG_VITALS_TSDB_ADDRESS: influxdb:8086
+      KONG_LICENSE_DATA: "${KONG_LICENSE_DATA}"
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_PROXY_LISTEN: "${KONG_PROXY_LISTEN:-0.0.0.0:8000}"
+      KONG_ADMIN_LISTEN: "${KONG_ADMIN_LISTEN:-0.0.0.0:8001}"
+      KONG_STREAM_LISTEN: "0.0.0.0:8500"
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_PREFIX: ${KONG_PREFIX:-/var/run/kong}
+      KONG_DECLARATIVE_CONFIG: "/opt/kong/kong.yaml"
+      KONG_TRACING: "${KONG_TRACING:-off}"
+      KONG_TRACING_WRITE_ENDPOINT: "${KONG_TRACING_WRITE_ENDPOINT:-/tracing/tracing.log}"
+    secrets:
+      - kong_postgres_password
+    networks:
+      - kong-net
+    ports:
+      # The following two environment variables default to an insecure value (0.0.0.0)
+      # according to the CIS Security test.
+      - "${KONG_INBOUND_PROXY_LISTEN:-0.0.0.0}:8000:8000/tcp"
+      - "${KONG_INBOUND_SSL_PROXY_LISTEN:-0.0.0.0}:8443:8443/tcp"
+      - "0.0.0.0:8001:8001/tcp"
+      - "0.0.0.0:8002:8002/tcp"
+      - "127.0.0.1:8444:8444/tcp"
+    healthcheck:
+      test: [ "CMD", "kong", "health" ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    restart: on-failure:5
+    read_only: true
+    volumes:
+      - kong_prefix_vol:${KONG_PREFIX:-/var/run/kong}
+      - kong_tmp_vol:/tmp
+      - ./config:/opt/kong
+      - ./data/tracing:/tracing
+    security_opt:
+      - no-new-privileges
+
+  db:
+    image: postgres:13
+    profiles: [ "database" ]
+    environment:
+      POSTGRES_DB: ${KONG_PG_DATABASE:-kong}
+      POSTGRES_USER: ${KONG_PG_USER:-kong}
+      POSTGRES_PASSWORD_FILE: /run/secrets/kong_postgres_password
+    secrets:
+      - kong_postgres_password
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "${KONG_PG_USER:-kong}" ]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    restart: on-failure
+    stdin_open: true
+    tty: true
+    networks:
+      - kong-net
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+
+secrets:
+  kong_postgres_password:
+    file: ./POSTGRES_PASSWORD

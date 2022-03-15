@@ -1,0 +1,107 @@
+# ------------------------------------------------------------------------------
+# This is an example file to get you started with using
+# declarative configuration in Kong.
+# ------------------------------------------------------------------------------
+
+# Metadata fields start with an underscore (_)
+# Fields that do not start with an underscore represent Kong entities and attributes
+
+# _format_version is mandatory,
+# it specifies the minimum version of Kong that supports the format
+
+_format_version: "2.1"
+
+# _transform is optional, defaulting to true.
+# It specifies whether schema transformations should be applied when importing this file
+# as a rule of thumb, leave this setting to true if you are importing credentials
+# with plain passwords, which need to be encrypted/hashed before storing on the database.
+# On the other hand, if you are reimporting a database with passwords already encrypted/hashed,
+# set it to false.
+
+_transform: true
+
+# A kong config file has an associated workspace. By default,
+# "default" workspace is used but can be changed via the metadata
+# field _workspace
+
+#_workspace: default
+
+plugins:
+  - name: zipkin
+    config:
+      local_service_name: kong
+      http_endpoint: http://metrics:9411/api/v2/spans
+      sample_ratio: 1
+      include_credential: true
+      traceid_byte_count: 16
+      header_type: preserve
+      default_header_type: b3
+      tags_header: Zipkin-Tags
+services:
+  # Uncomment when using the zipkin compose profile to expose the zipkin UI via Kong
+  #  - connect_timeout: 60000
+  #    host: zipkin
+  #    name: zipkin
+  #    path: /zipkin
+  #    port: 9411
+  #    protocol: http
+  #    read_timeout: 60000
+  #    retries: 5
+  #    routes:
+  #      - https_redirect_status_code: 426
+  #        name: zipkin
+  #        path_handling: v0
+  #        paths:
+  #          - /zipkin
+  #        preserve_host: false
+  #        protocols:
+  #          - http
+  #          - https
+  #        regex_priority: 0
+  #        request_buffering: true
+  #        response_buffering: true
+  #        strip_path: true
+  #    write_timeout: 60000
+  - connect_timeout: 60000
+    host: http-echo
+    name: http-echo-srv
+    port: 8080
+    protocol: http
+    read_timeout: 60000
+    retries: 5
+    routes:
+      - hosts:
+          - echo.dev
+        https_redirect_status_code: 426
+        id: 216771c4-3d66-4746-807e-7919f7de5fd2
+        path_handling: v0
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+    write_timeout: 60000
+  - connect_timeout: 60000
+    host: tcp-echo
+    name: tcp-echo-srv
+    port: 9000
+    protocol: tcp
+    read_timeout: 60000
+    retries: 5
+    routes:
+      - destinations:
+          - port: 8500
+        https_redirect_status_code: 426
+        id: 6618c7e6-267a-474e-b4a5-983d3c9e0b73
+        path_handling: v0
+        preserve_host: false
+        protocols:
+          - tcp
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+    write_timeout: 60000
