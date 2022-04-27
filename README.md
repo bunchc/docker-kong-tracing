@@ -1,32 +1,60 @@
-# Kong in Docker Compose w/ Jaeger or Zipkin
+# Kong in Docker Compose
 
-A docker-compose environment with Kong Gateway exporting tracing data to Jaeger or Zipkin.
+This is the official Docker Compose template for [Kong][kong-site-url].
 
-## Usage
+# What is Kong?
+
+You can find the official Docker distribution for Kong at [https://hub.docker.com/_/kong](https://hub.docker.com/_/kong).
+
+# How to use this template
+
+This Docker Compose template provisions a Kong container with a Postgres database, plus a nginx load-balancer. After running the template, the `nginx-lb` load-balancer will be the entrypoint to Kong.
+
+To run this template execute:
 
 ```shell
-# Set the Kong license
+$ docker-compose up
+```
+
+To scale Kong (ie, to three instances) execute:
+
+```shell
+$ docker-compose scale kong=3
+```
+
+Kong will be available through the `nginx-lb` instance on port `8000`, and `8001`. You can customize the template with your own environment variables or datastore configuration.
+
+Kong's documentation can be found at [https://docs.konghq.com/][kong-docs-url].
+
+## Issues
+
+If you have any problems with or questions about this image, please contact us through a [GitHub issue][github-new-issue].
+
+## Contributing
+
+You are invited to contribute new features, fixes, or updates, large or small; we are always thrilled to receive pull requests, and do our best to process them as fast as we can.
+
+Before you start to code, we recommend discussing your plans through a [GitHub issue][github-new-issue], especially for more ambitious contributions. This gives other contributors a chance to point you in the right direction, give you feedback on your design, and help you find out if someone else is working on the same thing.
+
+[kong-site-url]: https://konghq.com/
+[kong-docs-url]: https://docs.konghq.com/
+[github-new-issue]: https://github.com/Kong/docker-kong/issues/new
+
+## Examples
+
+Kong with Database
+
+```shell
+export KONG_DATABASE="postgres"
+export KONG_PG_DATABASE="kong"
+export COMPOSE_PROFILES="database,influx,jaeger"
 export KONG_LICENSE_DATA="$(cat ~/.kong-license-data/license.json)"
+export KONG_DOCKER_TAG=kong/kong-gateway:2.8.1.0-alpine
 
-# Configure the Kong docker image
-export KONG_DOCKER_TAG=kong/kong-gateway:2.8-alpine
-
-# Tells docker-compose which services to start.
-# Options are one of: zipkin, jaeger, influx
-# 'database' can also be provided to run Kong with a postgres database
-export COMPOSE_PROFILES='influx zipkin'
-
-# When using the 'database' profile, set this to 'postgres'
-export KONG_DATABASE=off
-
-# Enable Kong Vitals
-# When setting this to on, and KONG_DATABASE is set to off, use the 'influx' profile to store Vitals data in influxdb
-export KONG_VITALS=on
-
-# Enables Kong's Granular tracing
-# ref: https://docs.konghq.com/gateway/2.8.x/reference/configuration/#granular-tracing-section
-export KONG_TRACING=on
-
-# Start the environment
 docker-compose up -d
 ```
+
+## TODO
+
+* Add a consumer in `kong.yaml` for deck to apply
+* Add consumer to request in `test.sh`

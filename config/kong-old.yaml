@@ -35,7 +35,7 @@ plugins:
       include_credential: true
       traceid_byte_count: 16
       header_type: preserve
-      default_header_type: b3
+      default_header_type: ot
       tags_header: Zipkin-Tags
 services:
   # Uncomment when using the zipkin compose profile to expose the zipkin UI via Kong

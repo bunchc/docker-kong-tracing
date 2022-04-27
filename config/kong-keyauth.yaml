@@ -1,0 +1,86 @@
+_format_version: "1.1"
+consumers:
+- custom_id: test-user
+  keyauth_credentials:
+  - key: orehEcFAugWU7D2IZDY06HiOI4dlyjZE
+  username: test-uesr
+plugins:
+- config:
+    default_header_type: ot
+    default_service_name: null
+    header_type: preserve
+    http_endpoint: http://metrics:9411/api/v2/spans
+    include_credential: true
+    local_service_name: kong
+    sample_ratio: 1
+    static_tags: null
+    tags_header: Zipkin-Tags
+    traceid_byte_count: 16
+  enabled: true
+  name: zipkin
+  protocols:
+  - grpc
+  - grpcs
+  - http
+  - https
+services:
+- connect_timeout: 60000
+  host: http-echo
+  name: http-echo-srv
+  port: 8080
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - hosts:
+    - echo.dev
+    https_redirect_status_code: 426
+    id: 216771c4-3d66-4746-807e-7919f7de5fd2
+    path_handling: v0
+    plugins:
+    - config:
+        anonymous: null
+        hide_credentials: false
+        key_in_body: false
+        key_in_header: true
+        key_in_query: true
+        key_names:
+        - apikey
+        run_on_preflight: true
+      enabled: true
+      name: key-auth
+      protocols:
+      - grpc
+      - grpcs
+      - http
+      - https
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  host: tcp-echo
+  name: tcp-echo-srv
+  port: 9000
+  protocol: tcp
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - destinations:
+    - port: 8500
+    https_redirect_status_code: 426
+    id: 6618c7e6-267a-474e-b4a5-983d3c9e0b73
+    path_handling: v0
+    preserve_host: false
+    protocols:
+    - tcp
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
