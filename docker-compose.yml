@@ -197,6 +197,7 @@ services:
       KONG_ANONYMOUS_REPORTS: "off"
       KONG_KEYRING_ENABLED: "off"
       KONG_STATUS_LISTEN: "${KONG_STATUS_LISTEN:-0.0.0.0:8100}"
+      KONG_PORTAL: "on"
     depends_on:
       kong-migrations:
         condition: service_completed_successfully
